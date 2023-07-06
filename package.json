@@ -1,0 +1,25 @@
+{
+  "name": "image-to-s6",
+  "version": "1.0.0",
+  "description": "A tool that makes it easier to upload to Society6.",
+  "main": "image-to-s6.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:jimkang/image-to-s6.git"
+  },
+  "keywords": [],
+  "author": "Jim Kang",
+  "license": "Polyform Noncommercial License 1.0",
+  "bugs": {
+    "url": "https://github.com/jimkang/image-to-s6/issues"
+  },
+  "homepage": "https://github.com/jimkang/image-to-s6",
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "prettier": "^2.8.8"
+  },
+  "dependencies": {
+    "playwright": "^1.35.1"
+  }
+}
