@@ -10,6 +10,7 @@ async function uploadToS6({ browserType = defaultBrowserType }) {
   var browser = await playwright[browserType].launch({ headless: false });
   var page = await browser.newPage();
   await getToArtistStudio({ page });
+  await getToDesignUploader({ page });
 
   await stall(5);
   browser.close();
@@ -48,7 +49,18 @@ async function getToArtistStudio({ page }) {
 
   var loginSubmit = await page.locator('form[name="login"] > button');
   await loginSubmit.click();
-  await page.screenshot({ path: 'screenshot.png', fullPage: true });
+  await page.screenshot({ path: 'post-login.png', fullPage: true });
+}
+
+async function getToDesignUploader({ page }) {
+  await getRidOfSignInWithGoogle({ page });
+
+  var addDesignButton = await page
+    .getByRole('button')
+    .filter({ hasText: 'Add New Design' });
+  await addDesignButton.waitFor();
+  await addDesignButton.click();
+  await page.screenshot({ path: 'post-login.png', fullPage: true });
 }
 
 async function getRidOfSignInWithGoogle({ page }) {
