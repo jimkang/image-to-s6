@@ -11,6 +11,12 @@ async function uploadToS6({ browserType = defaultBrowserType }) {
   var page = await browser.newPage();
   await getToArtistStudio({ page });
   await getToDesignUploader({ page });
+  await uploadImage({
+    page,
+    title: 'Hill ' + ~~(Math.random() * 100),
+    filepath: process.env.testFilepath,
+  });
+  await publishDesign({ page });
 
   await stall(5);
   browser.close();
@@ -43,7 +49,7 @@ async function getToArtistStudio({ page }) {
   await passwordBox.click();
 
   await getRidOfSignInWithGoogle({ page });
-  passwordBox.fill(process.env.password);
+  await passwordBox.fill(process.env.password);
 
   await getRidOfSignInWithGoogle({ page });
 
@@ -61,6 +67,55 @@ async function getToDesignUploader({ page }) {
   await addDesignButton.waitFor();
   await addDesignButton.click();
   await page.screenshot({ path: 'post-login.png', fullPage: true });
+}
+
+async function uploadImage({ page, title, filepath }) {
+  var titleInput = await page.getByPlaceholder('Design Title');
+  await titleInput.waitFor();
+  await titleInput.fill(title);
+
+  var fileSelectButton = await page.locator('[qa-id="selectFile"]');
+  await fileSelectButton.waitFor();
+  var fileChooserPromise = page.waitForEvent('filechooser');
+  await fileSelectButton.click();
+
+  var fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(filepath);
+
+  await clickWhenReady({
+    page,
+    selector: 'button[qa-id="continue"]',
+    tries: 5,
+    isOk: elementIsNotFauxDisabled,
+  });
+  await clickWhenReady({
+    page,
+    selector: 'input[type=checkbox][name=copyrightApproved]',
+  });
+  await clickWhenReady({
+    page,
+    selector: 'input[type=radio][qa-id=matureContentFalse]',
+  });
+  // var notMatureRadioButton = await page.getByLabel('No');
+  // await notMatureRadioButton.waitFor();
+  // await notMatureRadioButton.click();
+
+  await clickWhenReady({
+    page,
+    role: 'button',
+    filter: { name: /^Continue/ },
+    tries: 5,
+    isOk: elementIsNotFauxDisabled,
+  });
+}
+
+async function publishDesign({ page }) {
+  await clickWhenReady({
+    page,
+    role: 'checkbox',
+    filter: { hasText: 'Select All' },
+  });
+  await clickWhenReady({ page, role: 'button', filter: { hasText: 'Enable' } });
 }
 
 async function getRidOfSignInWithGoogle({ page }) {
@@ -86,6 +141,43 @@ async function getRidOfSignInWithGoogle({ page }) {
 
 async function stall(seconds) {
   return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+}
+
+async function clickWhenReady({
+  page,
+  role,
+  filter,
+  selector,
+  isOk,
+  tries = 1,
+  secondsBetweenTries = 1,
+}) {
+  var locator;
+  var tryCount = 0;
+  do {
+    if (tryCount > 0) {
+      await stall(secondsBetweenTries);
+    }
+    if (selector) {
+      locator = await page.locator(selector);
+    } else {
+      locator = await page.getByRole(role, filter);
+    }
+    await locator.waitFor();
+    tryCount++;
+  } while (
+    tryCount < tries &&
+    typeof isOk === 'function' &&
+    (await isOk(locator))
+  );
+
+  await locator.click();
+  return locator;
+}
+
+async function elementIsNotFauxDisabled(locator) {
+  const classString = await locator.getAttribute('class');
+  return classString.includes('Disabled');
 }
 
 module.exports = { uploadToS6 };
