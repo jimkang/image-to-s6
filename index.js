@@ -18,7 +18,7 @@ async function uploadToS6({ browserType = defaultBrowserType }) {
   });
   await publishDesign({ page });
 
-  await stall(5);
+  await stall(10);
   browser.close();
 }
 
@@ -112,10 +112,26 @@ async function uploadImage({ page, title, filepath }) {
 async function publishDesign({ page }) {
   await clickWhenReady({
     page,
-    role: 'checkbox',
-    filter: { hasText: 'Select All' },
+    selector: 'input[type=checkbox][name=selectAllCreatives]',
   });
   await clickWhenReady({ page, role: 'button', filter: { hasText: 'Enable' } });
+  await clickWhenReady({ page, selector: '[qa-id="categoryDropdown"]' });
+
+  var fakeOption = await page.getByText('graphic design');
+  await fakeOption.waitFor();
+  await fakeOption.click();
+
+  var tagField = await page.locator('#search-creatives');
+  await tagField.click();
+  await page.keyboard.type('hills');
+  await page.keyboard.press('Enter');
+
+  // This is the artwork ownership checkbox.
+  await clickWhenReady({ page, selector: 'input[name="newsletterSignup"]' });
+
+  var fauxButton = await page.getByText('Publish Artwork');
+  await fauxButton.waitFor();
+  await fauxButton.click();
 }
 
 async function getRidOfSignInWithGoogle({ page }) {
@@ -163,7 +179,7 @@ async function clickWhenReady({
     } else {
       locator = await page.getByRole(role, filter);
     }
-    await locator.waitFor();
+    await locator.first().waitFor();
     tryCount++;
   } while (
     tryCount < tries &&
@@ -171,7 +187,7 @@ async function clickWhenReady({
     (await isOk(locator))
   );
 
-  await locator.click();
+  await locator.first().click();
   return locator;
 }
 
