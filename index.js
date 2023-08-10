@@ -1,22 +1,39 @@
 /* global process */
 require('dotenv').config();
 var playwright = require('playwright');
+var seedrandom = require('seedrandom');
+var Probable = require('probable').createProbable;
 
 // const nsInMS = 1e9 / 1000;
 
 const defaultBrowserType = 'firefox';
 
-async function uploadToS6({ browserType = defaultBrowserType }) {
+async function uploadToS6({
+  browserType = defaultBrowserType,
+  basenames,
+  variants,
+}) {
   var browser = await playwright[browserType].launch({ headless: false });
   var page = await browser.newPage();
+
   await getToArtistStudio({ page });
-  await getToDesignUploader({ page });
-  await uploadImage({
-    page,
-    title: 'Hill ' + ~~(Math.random() * 100),
-    filepath: process.env.testFilepath,
-  });
-  await publishDesign({ page });
+
+  for (let i = 0; i < basenames.length; ++i) {
+    const basename = basenames[i];
+
+    var prob = Probable({ random: seedrandom(i) });
+    await getToDesignUploader({ page });
+    await uploadImage({
+      page,
+      title: 'Hill ' + prob.roll(100),
+      srcpath: process.env.srcpath,
+      basename,
+      variants,
+    });
+    await publishDesign({ page });
+    // Reset the state of the publish page and its category menu.
+    await page.reload();
+  }
 
   await stall(10);
   browser.close();
@@ -24,6 +41,7 @@ async function uploadToS6({ browserType = defaultBrowserType }) {
 
 async function getToArtistStudio({ page }) {
   await page.goto('https://society6.com/artist-studio');
+
   var loginButton = await page.getByRole('button', {
     name: 'Log in / Sign up',
   });
@@ -69,7 +87,7 @@ async function getToDesignUploader({ page }) {
   await page.screenshot({ path: 'post-login.png', fullPage: true });
 }
 
-async function uploadImage({ page, title, filepath }) {
+async function uploadImage({ page, title, srcpath, basename, variants }) {
   var titleInput = await page.getByPlaceholder('Design Title');
   await titleInput.waitFor();
   await titleInput.fill(title);
@@ -80,7 +98,10 @@ async function uploadImage({ page, title, filepath }) {
   await fileSelectButton.click();
 
   var fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles(filepath);
+  var filepaths = variants.map(
+    (variant) => `${srcpath}/${basename}${variant ? '-' + variant : ''}.png`
+  );
+  await fileChooser.setFiles(filepaths);
 
   await clickWhenReady({
     page,
@@ -108,16 +129,28 @@ async function uploadImage({ page, title, filepath }) {
     isOk: elementIsNotFauxDisabled,
   });
 }
-
 async function publishDesign({ page }) {
+  // Sometimes the image upload view has popped up. Dismiss it.
+  var uploadCancelButton = await page.locator('[qa-id="cancel"]');
+  if ((await uploadCancelButton.count()) > 0) {
+    await uploadCancelButton.first().click();
+  }
+
   await clickWhenReady({
     page,
     selector: 'input[type=checkbox][name=selectAllCreatives]',
   });
   await clickWhenReady({ page, role: 'button', filter: { hasText: 'Enable' } });
+
   await clickWhenReady({ page, selector: '[qa-id="categoryDropdown"]' });
 
-  var fakeOption = await page.getByText('graphic design');
+  var categoryMenu = await page.locator(
+    '[qa-id="categoryDropdown"] > div > div:last-child > div'
+  );
+  await categoryMenu.waitFor();
+  console.log('categoryMenu count', await categoryMenu.count());
+
+  var fakeOption = await categoryMenu.getByText('graphic design');
   await fakeOption.waitFor();
   await fakeOption.click();
 
@@ -126,8 +159,10 @@ async function publishDesign({ page }) {
   await page.keyboard.type('hills');
   await page.keyboard.press('Enter');
 
+  console.log('Clicking ownership checkbox.');
   // This is the artwork ownership checkbox.
   await clickWhenReady({ page, selector: 'input[name="newsletterSignup"]' });
+  console.log('Ownership checkbox clicked.');
 
   var fauxButton = await page.getByText('Publish Artwork');
   await fauxButton.waitFor();
